@@ -1,32 +1,34 @@
 #lang racket
 (require rackunit)
 
-(define hand-definitions
+(define hand-patterns
   `(("Straight flush" ((any any) (incremented equal) (incremented equal) (incremented equal) (incremented equal)))
     ("Four of a kind" ((any any) (equal any) (equal any) (equal any)))
     ("Full house" ((any any) (equal any) (equal any)) ((any any) (equal any)))
-    ("Flush" (any any) (any equal) (any equal) (any equal) (any equal))
-    ("Straight" (any any) (incremented any) (incremented any) (incremented any) (incremented any))
+    ("Flush" ((any any) (any equal) (any equal) (any equal) (any equal)))
+    ("Straight" ((any any) (incremented any) (incremented any) (incremented any) (incremented any)))
     ("Three of a kind" ((any any) (equal any) (equal any)))
     ("Two pair" ((any any) (equal any)) ((any any) (equal any)))
     ("One pair" ((any any) (equal any)))
     ("High card" ((any any) (any any) (any any) (any any) (any any)))))
 
-
-
-
 (define one-pair-definition `("One pair" ((any any) (equal any))))
 (define three-of-a-kind `("Three of a kind" ((any any) (equal any) (equal any))))
+
+(define value first)
+(define suit second)
 
 
 (define (make-value-predicate value-definition previous-card)
   (match value-definition
     [`any (lambda (card) #t)]
-    [`equal (lambda (card) (eq? (first previous-card) (first card)))]))
+    [`equal (lambda (card) (eq? (value previous-card) (value card)))]
+    [`incremented (lambda (card) (eq? (add1 (value previous-card)) (value card)))]))
 
 (define (make-suit-predicate suit-definition previous-card)
   (match suit-definition
-    [(quote any) (lambda (card) #t)]))
+    [`any (lambda (card) #t)]
+    [`equal (lambda (card) (eq? (suit previous-card) (suit card)))]))
   
 
 (define (make-card-predicate hand-defintion previous-card)
@@ -36,13 +38,10 @@
       (and
        (value-predicate card)
        (suit-predicate card)))))
-    
-    
-    
-
+   
 (define (match-rec card-definitions cards previous-card matched-cards)
   (if (empty? card-definitions)
-      (list matched-cards cards)
+      (list (list matched-cards cards))
       (map
        (lambda (card) (first-or-default (match-rec (cdr card-definitions) (remove card cards) card (cons card matched-cards))))
        (filter (make-card-predicate (first card-definitions) previous-card) cards))))
@@ -56,18 +55,41 @@
 
 (null? (cdr (list 1)))
 
-(define (matches-hand? card-definitions cards)
-  (first-or-default (match-rec card-definitions cards `() `())))
+(define (match-hand hand-definitions cards)
+  (first-or-default (match-rec hand-definitions cards `() `())))
+
+(define (identify-hand-rec pattern cards)
+  (if (empty? pattern)
+      `(() cards)
+      (let ([matches (match-hand (first pattern) cards)])
+        (list
+         (append (first matches) (identify-hand-rec (cdr pattern) (second matches)))
+         (second matches)))))
+
+(define (identify-hand cards)
+  (first-or-default
+   (map (lambda (pattern)
+          (let
+            ([matching-cards (list (first pattern) (identify-hand-rec (cdr pattern) cards))])
+            (cond
+              [(empty? (second matching-cards)) null]
+               [else (first matching-cards)]))) hand-patterns)))
 
 ;tests
 (check-true (eq? `any (quote any)))
 (check-true ((make-value-predicate `any `(2 Hearts)) `(3 Clubs)))
 (check-true ((make-suit-predicate `any `(2 Hearts)) `(3 Clubs)))
 (check-true ((make-card-predicate `(any any) `(10 Spades)) `(5 Diamonds)))
-(matches-hand? (second one-pair-definition) `((2 Hearts) (3 Hearts) (2 Clubs)))
-(matches-hand? (second one-pair-definition) `((10 Hearts) (9 Hearts) (6 Clubs)))
-(matches-hand? (second one-pair-definition) `((2 Hearts) (3 Hearts) (2 Clubs) (2 Diamonds)))
-(matches-hand? (second three-of-a-kind) `((2 Hearts) (3 Hearts) (2 Clubs) (2 Diamonds)))
+(check-equal? (match-hand (second one-pair-definition) `((2 Hearts) (3 Hearts) (2 Clubs))) `(((2 Clubs) (2 Hearts)) ((3 Hearts))))
+;(check-equal? (match-hand (second one-pair-definition) `((10 Hearts) (9 Hearts) (6 Clubs))) `(() ((10 Hearts) (9 Hearts) (6 Clubs))))
+(match-hand (second one-pair-definition) `((10 Hearts) (9 Hearts) (6 Clubs)))
+;(match-hand (second one-pair-definition) `((2 Hearts) (3 Hearts) (2 Clubs) (2 Diamonds)))
+;(match-hand (second three-of-a-kind) `((2 Hearts) (3 Hearts) (2 Clubs) (2 Diamonds)))
+;(identify-hand `((2 Hearts) (2 Hearts)))
+;(identify-hand `((2 Hearts) (2 Hearts) (2 Spades) (3 Hearts)))
+;(identify-hand `((14 Hearts) (14 Hearts) (14 Spades) (14 Hearts)))
+;(identify-hand `((13 Hearts) (13 Hearts) (14 Spades) (14 Hearts)))
+;(identify-hand `((13 Hearts) (13 Hearts) (14 Spades) (14 Hearts) (14 Hearts)))
 
 ;(check-equal?
 ; (first (match-it one-pair-definition `((2 Hearts) (3 Hearts) (2 Clubs)) `())
