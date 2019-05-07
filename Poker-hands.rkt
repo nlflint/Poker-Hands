@@ -55,8 +55,8 @@
 
 (null? (cdr (list 1)))
 
-(define (match-hand hand-definitions cards)
-  (first-or-default (match-rec hand-definitions cards `() `())))
+(define (match-hand hand-definitions hand)
+  (first-or-default (match-rec hand-definitions (cards hand) `() `())))
 
 (define (identify-hand-rec pattern cards)
   (if (empty? pattern)
@@ -75,14 +75,21 @@
               [(empty? (second matching-cards)) null]
                [else (first matching-cards)]))) hand-patterns)))
 
+(define hand cons)
+(define name first)
+(define cards cdr)
+
+
 ;tests
 (check-true (eq? `any (quote any)))
 (check-true ((make-value-predicate `any `(2 Hearts)) `(3 Clubs)))
 (check-true ((make-suit-predicate `any `(2 Hearts)) `(3 Clubs)))
 (check-true ((make-card-predicate `(any any) `(10 Spades)) `(5 Diamonds)))
-(check-equal? (match-hand (second one-pair-definition) `((2 Hearts) (3 Hearts) (2 Clubs))) `(((2 Clubs) (2 Hearts)) ((3 Hearts))))
+(check-equal?
+ (match-hand (second one-pair-definition) (hand "Nate" `((2 Hearts) (3 Hearts) (2 Clubs))))
+ `(((2 Clubs) (2 Hearts)) ((3 Hearts))))
 ;(check-equal? (match-hand (second one-pair-definition) `((10 Hearts) (9 Hearts) (6 Clubs))) `(() ((10 Hearts) (9 Hearts) (6 Clubs))))
-(match-hand (second one-pair-definition) `((10 Hearts) (9 Hearts) (6 Clubs)))
+(match-hand (second one-pair-definition) (hand "Nate" `((10 Hearts) (9 Hearts) (6 Clubs))))
 ;(match-hand (second one-pair-definition) `((2 Hearts) (3 Hearts) (2 Clubs) (2 Diamonds)))
 ;(match-hand (second three-of-a-kind) `((2 Hearts) (3 Hearts) (2 Clubs) (2 Diamonds)))
 ;(identify-hand `((2 Hearts) (2 Hearts)))
